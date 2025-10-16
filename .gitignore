@@ -1,0 +1,28 @@
+# === Python (FastAPI backend) ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+venv/
+*.sqlite3
+
+# === Frontend (HTML/CSS/JS only) ===
+node_modules/
+dist/
+build/
+
+# === Docker ===
+*.env.docker
+*.tmp
+
+# === Kubernetes ===
+*.secret.yaml
+*.kubeconfig
+
+# === IDE / OS ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
