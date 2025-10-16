@@ -8,30 +8,30 @@ This project demonstrates a **complete CI/CD workflow** — from testing and con
 
 CICD/
 ├── .github/workflows/
-│ └── ci-cd.yaml # CI/CD workflow definition
+│   └── ci-cd.yaml          # CI/CD workflow definition
 │
 ├── app/
-│ ├── index.html # Frontend UI
-│ ├── script.js
-│ └── styles.css
+│   ├── index.html          # Frontend UI
+│   ├── script.js
+│   └── styles.css
 │
 ├── backend/
-│ ├── app.py # FastAPI backend
-│ ├── requirements.txt
-│ ├── Dockerfile
-│ └── tests/
-│ └── test_mongo_ping.py
+│   ├── app.py              # FastAPI backend
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── tests/
+│       └── test_mongo_ping.py
 │
 ├── k8s/
-│ ├── backend/
-│ │ ├── deployment.yaml
-│ │ └── service.yaml
-│ ├── frontend/
-│ │ ├── deployment.yaml
-│ │ └── service.yaml
-│ └── ingress.yaml
+│   ├── backend/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   ├── frontend/
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   └── ingress.yaml
 │
-└── Dockerfile # Base Docker setup
+└── Dockerfile              # Base Docker setup
 
 
 
@@ -78,7 +78,7 @@ Every **push to the `main` branch** triggers the following pipeline automaticall
 |-----------|--------------|
 | `ATLAS_URI` | MongoDB Atlas connection URI |
 | `BASE64_KUBECONFIG` | Encoded kubeconfig for cluster access |
-| `DOMAIN` | Application domain (e.g., `18.215.150.13.nip.io`) |
+| `DOMAIN` | Application domain (e.g., `<PUBLIC_IP>.nip.io`) |
 | `REPO_LC` | Repository name used for GHCR image tagging |
 
 ---
