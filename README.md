@@ -1,6 +1,6 @@
 # 🚀 CI/CD Pipeline Project  
 
-This project demonstrates a **complete CI/CD workflow** — from testing and containerization to automated deployment on a Kubernetes cluster, all using modern DevOps best practices.  
+This project demonstrates a **complete CI/CD workflow** - from testing and containerization to automated deployment on a Kubernetes cluster, all using modern DevOps best practices.  
 
 ---
 
