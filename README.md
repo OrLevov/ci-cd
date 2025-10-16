@@ -6,6 +6,7 @@ This project demonstrates a **complete CI/CD workflow** — from testing and con
 
 ## 🧩 Project Structure  
 
+```bash
 CICD/
 ├── .github/workflows/
 │   └── ci-cd.yaml          # CI/CD workflow definition
@@ -32,7 +33,6 @@ CICD/
 │   └── ingress.yaml
 │
 └── Dockerfile              # Base Docker setup
-
 
 
 ---
