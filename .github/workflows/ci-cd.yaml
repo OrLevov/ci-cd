@@ -1,0 +1,127 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+env:
+  APP_FE: login-frontend
+  APP_BE: login-backend
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test_backend:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:6
+        ports: ["27017:27017"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: pip install --no-cache-dir -r backend/requirements.txt
+      - name: Quick Mongo ping
+        run: |
+          python - <<'PY'
+          import asyncio
+          from motor.motor_asyncio import AsyncIOMotorClient
+          async def main():
+              c = AsyncIOMotorClient("mongodb://localhost:27017")
+              await c.admin.command("ping")
+              print("Mongo OK")
+          asyncio.run(main())
+          PY
+
+  build_and_push:
+    needs: test_backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vars
+        id: v
+        run: |
+          echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "REPO_LC=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ FRONTEND (root Dockerfile)
+      - name: Build & Push Frontend
+        run: |
+          docker build -f Dockerfile -t ghcr.io/${REPO_LC}:${{ steps.v.outputs.sha }} -t ghcr.io/${REPO_LC}:latest .
+          docker push ghcr.io/${REPO_LC}:${{ steps.v.outputs.sha }}
+          docker push ghcr.io/${REPO_LC}:latest
+
+      # ✅ BACK-END (backend/Dockerfile)
+      - name: Build & Push Backend
+        run: |
+          docker build -f backend/Dockerfile -t ghcr.io/${REPO_LC}-backend:${{ steps.v.outputs.sha }} -t ghcr.io/${REPO_LC}-backend:latest backend
+          docker push ghcr.io/${REPO_LC}-backend:${{ steps.v.outputs.sha }}
+          docker push ghcr.io/${REPO_LC}-backend:latest
+
+  deploy:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load kubeconfig and envs
+        run: |
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > kubeconfig
+          echo "DOMAIN=${{ secrets.K8S_DOMAIN }}" >> $GITHUB_ENV
+          echo "ATLAS_URI=${{ secrets.ATLAS_URI }}" >> $GITHUB_ENV
+          # compute lowercase repo once here too
+          echo "REPO_LC=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Short SHA
+        id: v
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Apply Mongo secret
+        run: |
+          if [ -n "${{ env.ATLAS_URI }}" ]; then
+            kubectl --kubeconfig kubeconfig create secret generic atlas-secret \
+              --from-literal=uri="${{ env.ATLAS_URI }}" \
+              --namespace default --dry-run=client -o yaml | kubectl --kubeconfig kubeconfig apply -f -
+          fi
+
+      - name: Deploy backend
+        run: |
+          sed "s/{{GIT_SHA}}/${{ steps.v.outputs.sha }}/g" k8s/backend/deployment.yaml \
+            | envsubst > /tmp/backend.yaml
+          kubectl --kubeconfig kubeconfig apply -f /tmp/backend.yaml
+          kubectl --kubeconfig kubeconfig apply -f k8s/backend/service.yaml
+
+      - name: Deploy frontend
+        run: |
+          sed "s/{{GIT_SHA}}/${{ steps.v.outputs.sha }}/g" k8s/frontend/deployment.yaml \
+            | envsubst > /tmp/frontend.yaml
+          kubectl --kubeconfig kubeconfig apply -f /tmp/frontend.yaml
+          kubectl --kubeconfig kubeconfig apply -f k8s/frontend/service.yaml
+          envsubst < k8s/ingress.yaml | kubectl --kubeconfig kubeconfig apply -f -
+
+      - name: Wait for rollouts (parallel)
+        run: |
+          set -e
+          kubectl --kubeconfig kubeconfig rollout status deploy/login-backend --timeout=180s &
+          kubectl --kubeconfig kubeconfig rollout status deploy/login-frontend --timeout=180s &
+          wait
+

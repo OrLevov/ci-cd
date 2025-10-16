@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: login-backend
+  labels: { app: login-backend }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: login-backend } }
+  template:
+    metadata: { labels: { app: login-backend } }
+    spec:
+      imagePullSecrets: [{ name: ghcr-login }]
+      containers:
+        - name: backend
+          image: ghcr.io/${REPO_LC}-backend:{{GIT_SHA}}
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8000 }]
+          # If your app needs Mongo, expose it as both names (whichever your code reads)
+          env:
+            - name: MONGODB_URI
+              valueFrom: { secretKeyRef: { name: atlas-secret, key: uri } }
+            - name: ATLAS_URI
+              valueFrom: { secretKeyRef: { name: atlas-secret, key: uri } }
+
+          # PROBES tuned to avoid flakiness
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6     # gives ~30s to become ready
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
